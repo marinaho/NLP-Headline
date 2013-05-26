@@ -1,7 +1,7 @@
 bin/*.class
-docs/
-eval/
-output/
+docs/*
+eval/*
+output/*
 
 # Package Files #
 *.war

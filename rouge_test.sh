@@ -20,4 +20,7 @@ ROUGE/RELEASE-1.5.5/ROUGE-1.5.5.pl  \
   -a -c 95 -b 75 -m -n 4 -w 1.2     \
   $ROUGE_INPUT > $ROUGE_OUTPUT
 
+# Output ROUGE results
+cat $ROUGE_OUTPUT
+
 cd ..
