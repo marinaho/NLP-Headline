@@ -23,8 +23,9 @@ public class SummaryGenerator {
 			"``", "''", "(", ")", ",", "--", ".", ":" };
 	private final static HashSet<String> PUNCTUATION = new HashSet<String>(
 			Arrays.asList(PUNCTUATION_VALUES));
-	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
-			"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
+	private static final String[] CLOSED_CLASS_VALUES = new String[] {};
+	// private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
+	//		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
 			Arrays.asList(CLOSED_CLASS_VALUES));
 
@@ -281,12 +282,10 @@ public class SummaryGenerator {
 		if(sentence.startsWith("For example "))
 			sentence = sentence.substring(11);
 		
-		// Remove appositives
 		Properties props = new Properties();
 		props.put("annotators", COMPRESS_PROPERTIES);
 		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 		
-		// Remove temporals
 		Annotation document = new Annotation(sentence);
 		pipeline.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
@@ -294,15 +293,21 @@ public class SummaryGenerator {
 		 
 		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
 		
+		// Remove leaves from dependency graph
+		Set<IndexedWord> leaves = dependencies.getLeafVertices();
+		for(IndexedWord leaf: leaves)
+			dependencies.removeVertex(leaf);
+		
+		// Remove temporals and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
 		
 		for(SemanticGraphEdge edge : listDep)
 		{
 			IndexedWord w = edge.getDependent();
-			System.out.println("Removin " + w);
 			dependencies.removeVertex(w);
 		}
+		System.out.println(dependencies.toRecoveredSentenceString());
 		return dependencies.toRecoveredSentenceString();
 	}	 
 }
