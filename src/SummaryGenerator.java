@@ -1,13 +1,10 @@
 import java.io.*;
 import java.util.*;
 
-import edu.stanford.nlp.dcoref.CorefChain;
-import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 import edu.stanford.nlp.pipeline.*;
 import edu.stanford.nlp.trees.*;
-import edu.stanford.nlp.trees.TreeCoreAnnotations.*;
 import edu.stanford.nlp.trees.semgraph.*;
 import edu.stanford.nlp.trees.semgraph.SemanticGraphCoreAnnotations.*;
 import edu.stanford.nlp.util.*;
@@ -23,9 +20,8 @@ public class SummaryGenerator {
 			"``", "''", "(", ")", ",", "--", ".", ":" };
 	private final static HashSet<String> PUNCTUATION = new HashSet<String>(
 			Arrays.asList(PUNCTUATION_VALUES));
-	private static final String[] CLOSED_CLASS_VALUES = new String[] {};
-	// private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
-	// "CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
+	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
+		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
 			Arrays.asList(CLOSED_CLASS_VALUES));
 
@@ -284,30 +280,33 @@ public class SummaryGenerator {
 				CollapsedCCProcessedDependenciesAnnotation.class);
 
 		// Remove leaves from dependency graph
+		/*
 		Set<IndexedWord> leaves = dependencies.getLeafVertices();
 		for (IndexedWord leaf : leaves)
 			dependencies.removeVertex(leaf);
 
 		String trimmedSentence = dependencies.toRecoveredSentenceString();
-		if (trimmedSentence.length() < MAX_LENGTH)
-			return trimmedSentence;
-
-		// Remove temporals, abbreviations and appositives
-		List<SemanticGraphEdge> listDep = dependencies
-				.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
-		listDep.addAll(dependencies
-				.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
-		listDep.addAll(dependencies
-				.findAllRelns(EnglishGrammaticalRelations.ABBREVIATION_MODIFIER));
-
-		for (SemanticGraphEdge edge : listDep) {
+		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;*/
+		
+		// Remove temporals, abbreviations and appositives		
+		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ABBREVIATION_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADJECTIVAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.AGENT));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADVERBIAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARTICIPIAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARATAXIS));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.CONJUNCT ));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.COORDINATION ));
+		
+		for(SemanticGraphEdge edge : listDep)
+		{
 			IndexedWord w = edge.getDependent();
 			dependencies.removeVertex(w);
 		}
-
-		// FIXME: remove
 		// System.out.println(dependencies.toRecoveredSentenceString());
-
 		return dependencies.toRecoveredSentenceString();
 	}
 }
+
