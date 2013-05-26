@@ -1,7 +1,6 @@
 import java.io.*;
 import java.util.*;
 
-import edu.stanford.nlp.trees.EnglishGrammaticalStructure;
 import edu.stanford.nlp.dcoref.CorefChain;
 import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
 import edu.stanford.nlp.ling.*;
@@ -266,19 +265,46 @@ public class SummaryGenerator {
 		// .get(CorefChainAnnotation.class);
 	}
 	private String compressSentence(String sentence) {
+		// Remove "a" and "the" determiners
+		sentence.replaceAll(" a ", " ");
+		sentence.replaceAll(" A ", " ");
+		sentence.replaceAll(" the ", " ");
+		sentence.replaceAll(" The ", " ");
+		sentence.replaceAll("^a ", " ");
+		sentence.replaceAll("^A ", " ");
+		sentence.replaceAll("^the ", " ");
+		sentence.replaceAll("^The ", " ");
+		
+		// Remove initial adverbials
+		if(sentence.startsWith("On the other hand "))
+			sentence = sentence.substring(17);
+		if(sentence.startsWith("For example "))
+			sentence = sentence.substring(11);
+		
+		// Remove appositives
 		Properties props = new Properties();
 		props.put("annotators", COMPRESS_PROPERTIES);
 		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
 		
+		// Remove temporals
 		Annotation document = new Annotation(sentence);
 		pipeline.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		Tree tree = sentences.get(0).get(TreeAnnotation.class);
-		EnglishGrammaticalStructure dependencyGraph = new EnglishGrammaticalStructure(tree); 
+		 
 		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
-
-		System.out.println("English gramm structure: " +dependencyGraph);
-		dependencies.prettyPrint();
+		
+		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
+		
+		for(SemanticGraphEdge edge : listDep)
+		{
+			IndexedWord w = edge.getDependent();
+			System.out.println("Removin " + w);
+			dependencies.removeVertex(w);
+		}
+		System.out.println(dependencies.toRecoveredSentenceString());
+		
 		return sentence;
 	}	 
 }
