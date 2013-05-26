@@ -17,6 +17,7 @@ public class SummaryGenerator {
 	
 	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit, pos, lemma";
 	private final static String ADD_REST_PROPERTIES = "";
+	private final static String COMPRESS_PROPERTIES = "tokenize, ssplit, pos, parse";
 
 	private static final String[] PUNCTUATION_VALUES = new String[] { "$",
 			"``", "''", "(", ")", ",", "--", ".", ":" };
