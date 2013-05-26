@@ -196,7 +196,9 @@ public class SummaryGenerator {
 
 			// For java garbage collector
 			annotations.set(i, null);
+			// System.out.println("before compress " + bestSentence);
 			String compressedSentence = compressSentence(bestSentence.toString());
+			// System.out.println("after compress " + compressedSentence);
 			
 			try {
 				out.write(compressedSentence);
@@ -306,14 +308,14 @@ public class SummaryGenerator {
 
 	private String compressSentence(String sentence) {
 		// Remove "a" and "the" determiners
-		sentence.replaceAll(" a ", " ");
-		sentence.replaceAll(" A ", " ");
-		sentence.replaceAll(" the ", " ");
-		sentence.replaceAll(" The ", " ");
-		sentence.replaceAll("^a ", " ");
-		sentence.replaceAll("^A ", " ");
-		sentence.replaceAll("^the ", " ");
-		sentence.replaceAll("^The ", " ");
+		sentence = sentence.replaceAll(" a ", " ");
+		sentence = sentence.replaceAll(" A ", " ");
+		sentence = sentence.replaceAll(" the ", " ");
+		sentence = sentence.replaceAll(" The ", " ");
+		sentence = sentence.replaceAll("^a ", " ");
+		sentence = sentence.replaceAll("^A ", " ");
+		sentence = sentence.replaceAll("^the ", " ");
+		sentence = sentence.replaceAll("^The ", " ");
 
 		if (sentence.length() < MAX_LENGTH)
 			return sentence;
