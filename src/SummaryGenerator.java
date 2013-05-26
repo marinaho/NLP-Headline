@@ -276,11 +276,15 @@ public class SummaryGenerator {
 		sentence.replaceAll("^the ", " ");
 		sentence.replaceAll("^The ", " ");
 		
+		if(sentence.length() < MAX_LENGTH) return sentence;
+		
 		// Remove initial adverbials
 		if(sentence.startsWith("On the other hand "))
 			sentence = sentence.substring(17);
 		if(sentence.startsWith("For example "))
 			sentence = sentence.substring(11);
+		
+		if(sentence.length() < MAX_LENGTH) return sentence;
 		
 		Properties props = new Properties();
 		props.put("annotators", COMPRESS_PROPERTIES);
@@ -297,6 +301,9 @@ public class SummaryGenerator {
 		Set<IndexedWord> leaves = dependencies.getLeafVertices();
 		for(IndexedWord leaf: leaves)
 			dependencies.removeVertex(leaf);
+		
+		String trimmedSentence = dependencies.toRecoveredSentenceString();
+		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;
 		
 		// Remove temporals and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
