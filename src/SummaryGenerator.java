@@ -298,24 +298,33 @@ public class SummaryGenerator {
 		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
 		
 		// Remove leaves from dependency graph
+		/*
 		Set<IndexedWord> leaves = dependencies.getLeafVertices();
 		for(IndexedWord leaf: leaves)
 			dependencies.removeVertex(leaf);
 		
 		String trimmedSentence = dependencies.toRecoveredSentenceString();
-		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;
+		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;*/
 		
 		// Remove temporals, abbreviations and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ABBREVIATION_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADJECTIVAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.AGENT));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADVERBIAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARTICIPIAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARATAXIS));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.CONJUNCT ));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.COORDINATION ));
 		
 		for(SemanticGraphEdge edge : listDep)
 		{
 			IndexedWord w = edge.getDependent();
 			dependencies.removeVertex(w);
 		}
-		System.out.println(dependencies.toRecoveredSentenceString());
+		// System.out.println(dependencies.toRecoveredSentenceString());
 		return dependencies.toRecoveredSentenceString();
 	}	 
 }
+
