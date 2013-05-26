@@ -26,18 +26,17 @@ public class Headline {
 
 	static CoreMap compressSentence(CoreMap s)
 	{
+		// TO DO:
 	    return s;
 	}
 	static void annotate(String dirname, HashMap<String, Integer> df, ArrayList<Annotation> annotations, ArrayList<String> filenames)
 	{
-		File dir = new File(dirname);
+		File dirparent = new File(dirname);
 		String text = "", line;
-		for (File doc : dir.listFiles()) 
-			if(doc.isDirectory())
-			{			
-				File resultDir = new File("./results/" + doc);
-				if (!resultDir.exists()) resultDir.mkdir();
-				for (File file: doc.listFiles()) {
+		for (File dir : dirparent.listFiles()) 
+			if(dir.isDirectory())
+			{				
+				for (File file: dir.listFiles()) {
 					HashMap<String, Boolean> hasTerm = new HashMap<String, Boolean>();
 					BufferedReader br = null;
 					++noDocs;
@@ -71,7 +70,7 @@ public class Headline {
 					Annotation document = new Annotation(text);
 
 					// run all Annotators on this text
-					System.out.println("Processing " + doc.getName() + " " + file.getName());
+					System.out.println("Annotating " + dir.getName() + " " + file.getName());
 					pipeline.annotate(document);
 					System.out.println("done");
 
@@ -92,10 +91,7 @@ public class Headline {
 							}
 						}
 					annotations.add(document);
-					filenames.add("./results/" + doc.getName().substring(0, doc.getName().length()-1).toUpperCase() + ".P.10.T.1." + file.getName());
-
-					// System.out.println("Dir " + doc.getName() + " file " + file.getName());
-					// System.out.println(firstSentence);
+					filenames.add("./results/" + dir.getName().substring(0, dir.getName().length()-1).toUpperCase() + ".P.10.T.1." + file.getName());
 				}
 			}
 	}
@@ -108,10 +104,24 @@ public class Headline {
 	}
 	static void processDocs()
 	{
+		File resultDir = new File("./results/");
+		if (!resultDir.exists()) resultDir.mkdir();
+		
 		// Compute TF-IDF per sentence
 		for(int i = 0; i < annotations.size(); ++i)
 		{
-			System.out.println("Processing document " + filenames.get(i));
+			System.out.println("Scoring document " + filenames.get(i));
+			File file = new File(filenames.get(i));
+			if(!file.exists())
+			{
+			  try {
+			      file.createNewFile();
+			  }
+			  catch(IOException ioe) {
+				  System.out.println("Couldn't create file " + filenames.get(i));
+			      ioe.printStackTrace();
+			  }
+			}
 			PrintWriter writer = null;
 			try {
 				writer = new PrintWriter(filenames.get(i));
@@ -128,24 +138,28 @@ public class Headline {
 				for(CoreLabel token: sentence.get(TokensAnnotation.class))
 				{
 					String word = token.get(TextAnnotation.class);
-					String pos = token.get(PartOfSpeechAnnotation.class);
-					System.out.println(word + " " + pos);
 					if(tf.containsKey(word))
 						tf.put(word, tf.get(word) + 1);
 					else tf.put(word, 1);
 				}
 			}
-			double scoren1 = 0, scoren2 = 0, scorev1 = 0, scorev2 = 0, cscore;
-			String wordn1 = "", wordn2 = "", wordvb1 = "", wordvb2 = "";
+			double maxSentenceScore = 0;
+			CoreMap bestSentence = null;
 			for(CoreMap sentence : sentences)
 			{
+				double scoren1 = 0, scoren2 = 0, scorev1 = 0, scorev2 = 0, cscore, sentenceScore = 0;
+				String wordn1 = "", wordn2 = "", wordvb1 = "", wordvb2 = "";
 				for(CoreLabel token: sentence.get(TokensAnnotation.class))
 				{
 					String word = token.get(TextAnnotation.class);
 					String pos = token.get(PartOfSpeechAnnotation.class);
 
 					cscore = Math.log(tf.get(word) + 1) * Math.log((double)noDocs / df.get(word));
-					if(pos.indexOf("NN") == 0)
+					sentenceScore += cscore;
+					if(sentenceScore > maxSentenceScore)
+						bestSentence = sentence;
+					/* Find 2 best nouns, 2 best verbs
+					 * if(pos.indexOf("NN") == 0)
 					{
 						if(cscore > scoren1) {
 							scoren2 = scoren1;
@@ -158,8 +172,7 @@ public class Headline {
 						} 
 
 					}
-					else if(pos.indexOf("VB") == 0)
-					{
+					else if(pos.indexOf("VB") == 0) {
 						if(cscore > scorev1) {
 						   scorev2 = scorev1;
 						   wordvb2 = wordvb1;
@@ -169,7 +182,7 @@ public class Headline {
 						   scorev2 = cscore;
 						   wordvb2 = word;
 						}
-					}
+					}*/
 				}
 
 			    // this is the parse tree of the current sentence; needs parse in main in the pipeline init
@@ -182,6 +195,8 @@ public class Headline {
 			 //   System.out.println("Tree:" + tree);
 			 //   System.out.println("Dependencies:" + dependencies);
 			}
+			System.out.println("Best sentence: " + bestSentence);
+			writer.println(bestSentence);
 			if(writer != null) writer.close();
 			//System.out.println("Most important nouns " + wordn1 + " " + wordn2 + " scores " + scoren1 + " " + scoren2);
 			//System.out.println("Most important verbs " + wordvb1 + " " + wordvb2 + " scores " + scorev1 + " " + scorev2);
