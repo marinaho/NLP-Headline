@@ -162,7 +162,6 @@ public class SummaryGenerator {
 				
 				double maxSentenceScore = 0;
 				for (CoreMap sentence : sentences) {
-					int numBestWords = 0;
 					double cscore, sentenceScore = 0;
 					// Compute sentence with best score
 					
@@ -196,11 +195,11 @@ public class SummaryGenerator {
 			// For java garbage collector
 			annotations.set(i, null);
 			// System.out.println("before compress " + bestSentence);
-			String compressedSentence = compressSentence(bestSentence.toString());
-			// System.out.println("after compress " + compressedSentence);
+			bestSentence = compressSentence(bestSentence);
+			// System.out.println("after compress " + bestSentence);
 			
 			try {
-				out.write(compressedSentence);
+				out.write(bestSentence);
 				out.close();
 			} catch (IOException e) {
 				System.out.println("Error at writing in file: " + bestSentence);
