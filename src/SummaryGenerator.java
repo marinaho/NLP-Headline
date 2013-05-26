@@ -70,10 +70,10 @@ public class SummaryGenerator {
 			{
 				for(CoreLabel token: sentence.get(TokensAnnotation.class))
 				{
-					String word = token.get(TextAnnotation.class);
-					if(tf.containsKey(word))
-						tf.put(word, tf.get(word) + 1);
-					else tf.put(word, 1);
+					String lemma = token.get(LemmaAnnotation.class);
+					if(tf.containsKey(lemma))
+						tf.put(lemma, tf.get(lemma) + 1);
+					else tf.put(lemma, 1);
 				}
 			}
 			
@@ -85,10 +85,10 @@ public class SummaryGenerator {
 				double cscore, sentenceScore = 0;
 				for(CoreLabel token: sentence.get(TokensAnnotation.class))
 				{
-					String word = token.get(TextAnnotation.class);
+					String lemma = token.get(LemmaAnnotation.class);
 					String pos = token.get(PartOfSpeechAnnotation.class);
 
-					cscore = Math.log(tf.get(word) + 1) * Math.log((double)noDocs / df.get(word));
+					cscore = Math.log(tf.get(lemma) + 1) * Math.log((double)noDocs / df.get(lemma));
 					sentenceScore += cscore;
 					if(sentenceScore > maxSentenceScore)
 					{
@@ -190,13 +190,13 @@ public class SummaryGenerator {
 		for(CoreMap sentence: sentences)
 			for(CoreLabel token: sentence.get(TokensAnnotation.class))
 			{
-				String word = token.getString(TextAnnotation.class);
-				if(!hasTerm.containsKey(word))
+				String lemma = token.getString(LemmaAnnotation.class);
+				if(!hasTerm.containsKey(lemma))
 				{
-					hasTerm.put(word, true);
-					if(df.containsKey(word))
-						df.put(word, df.get(word) + 1);
-					else df.put(word, 1);
+					hasTerm.put(lemma, true);
+					if(df.containsKey(lemma))
+						df.put(lemma, df.get(lemma) + 1);
+					else df.put(lemma, 1);
 				}
 			}
 		
