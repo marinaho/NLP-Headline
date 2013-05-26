@@ -1,6 +1,7 @@
 import java.io.*;
 import java.util.*;
 
+import edu.stanford.nlp.trees.EnglishGrammaticalStructure;
 import edu.stanford.nlp.dcoref.CorefChain;
 import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
 import edu.stanford.nlp.ling.*;
@@ -273,7 +274,11 @@ public class SummaryGenerator {
 		pipeline.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		Tree tree = sentences.get(0).get(TreeAnnotation.class);
-		System.out.println(tree);
+		EnglishGrammaticalStructure dependencyGraph = new EnglishGrammaticalStructure(tree); 
+		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
+
+		System.out.println("English gramm structure: " +dependencyGraph);
+		dependencies.prettyPrint();
 		return sentence;
 	}	 
 }
