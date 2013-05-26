@@ -29,7 +29,7 @@ public class SummaryGenerator {
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
 			Arrays.asList(CLOSED_CLASS_VALUES));
 
-	private final StanfordCoreNLP pipeline;
+	private final StanfordCoreNLP pipeline, pipelineCompress;
 
 	private final String inputDir;
 	private final String outputDir;
@@ -56,6 +56,10 @@ public class SummaryGenerator {
 		props.put("annotators", properties);
 		// "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 		pipeline = new StanfordCoreNLP(props);
+		
+		Properties propsCompress = new Properties();
+		propsCompress.put("annotators", COMPRESS_PROPERTIES);
+		pipelineCompress = new StanfordCoreNLP(propsCompress);
 	}
 
 	public void scoreAndResults() {
@@ -286,12 +290,8 @@ public class SummaryGenerator {
 		
 		if(sentence.length() < MAX_LENGTH) return sentence;
 		
-		Properties props = new Properties();
-		props.put("annotators", COMPRESS_PROPERTIES);
-		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
-		
 		Annotation document = new Annotation(sentence);
-		pipeline.annotate(document);
+		pipelineCompress.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		Tree tree = sentences.get(0).get(TreeAnnotation.class);
 		 
@@ -305,9 +305,10 @@ public class SummaryGenerator {
 		String trimmedSentence = dependencies.toRecoveredSentenceString();
 		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;
 		
-		// Remove temporals and appositives		
+		// Remove temporals, abbreviations and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ABBREVIATION_MODIFIER));
 		
 		for(SemanticGraphEdge edge : listDep)
 		{
