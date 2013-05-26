@@ -12,20 +12,52 @@ import edu.stanford.nlp.trees.semgraph.*;
 import edu.stanford.nlp.trees.semgraph.SemanticGraphCoreAnnotations.*;
 import edu.stanford.nlp.util.*;
 
+class Tuple implements Comparable<Tuple> {
+	private final static double EPS = 1e-6;
+	public Double score;
+	public String word;
+
+	Tuple(Double sc, String w)
+	{
+		score = sc;
+		word = w;
+	}
+
+	@Override
+	public int compareTo(Tuple t) {
+		if(score > t.score) return 1;
+		else if(Math.abs(score - t.score) < EPS) return 0;
+		return -1;
+	}
+
+	boolean equals(Tuple t) {
+		if(score == t.score && t.word.compareTo(word) == 0) return true;
+		return false;
+	}
+
+	@Override
+	public int hashCode() {
+		final int prime = 31;
+		return (int)(prime * score) + ((word == null) ? 0 : word.hashCode());
+	}
+}
+
 public class SummaryGenerator {
 	private final static int MAX_LENGTH = 75;
-	
+
 	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit, pos, lemma";
 	private final static String ADD_REST_PROPERTIES = "";
 	private final static String COMPRESS_PROPERTIES = "tokenize, ssplit, pos, parse";
 
 	private static final String[] PUNCTUATION_VALUES = new String[] { "$",
-			"``", "''", "(", ")", ",", "--", ".", ":" };
+		"``", "''", "(", ")", ",", "--", ".", ":" };
 	private final static HashSet<String> PUNCTUATION = new HashSet<String>(
 			Arrays.asList(PUNCTUATION_VALUES));
-	private static final String[] CLOSED_CLASS_VALUES = new String[] {};
-	// private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
-	//		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
+	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
+		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
+
+	private final static int BEST_TFIDF = 10;
+
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
 			Arrays.asList(CLOSED_CLASS_VALUES));
 
@@ -36,7 +68,7 @@ public class SummaryGenerator {
 	private final boolean posTag;
 
 	private static int noDocs = 0;
-	private static HashMap<String, Integer> df = new HashMap<String, Integer>();
+	private static HashMap<String, Double> df = new HashMap<String, Double>();
 	private static ArrayList<Annotation> annotations = new ArrayList<Annotation>();
 	private static ArrayList<String> outNames = new ArrayList<String>();
 
@@ -56,7 +88,7 @@ public class SummaryGenerator {
 		props.put("annotators", properties);
 		// "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 		pipeline = new StanfordCoreNLP(props);
-		
+
 		Properties propsCompress = new Properties();
 		propsCompress.put("annotators", COMPRESS_PROPERTIES);
 		pipelineCompress = new StanfordCoreNLP(propsCompress);
@@ -77,14 +109,36 @@ public class SummaryGenerator {
 			// Compute term frequency scores for each word
 			Annotation an = annotations.get(i);
 			List<CoreMap> sentences = an.get(SentencesAnnotation.class);
-			HashMap<String, Integer> tf = new HashMap<String, Integer>();
+			HashMap<String, Double> tf = new HashMap<String, Double>();
+			TreeSet<Tuple> set = new TreeSet<Tuple>();
+
 			for (CoreMap sentence : sentences) {
 				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 					String lemma = token.get(LemmaAnnotation.class);
+					String pos = null;
+					if (posTag) {
+						pos = token.get(PartOfSpeechAnnotation.class);
+					}
+					if (CLOSED_CLASS.contains(pos) || PUNCTUATION.contains(pos)) continue;
+
 					if (tf.containsKey(lemma))
 						tf.put(lemma, tf.get(lemma) + 1);
 					else
-						tf.put(lemma, 1);
+						tf.put(lemma, new Double(1));
+				}
+			}
+
+			// Compute top scoring words
+			for (Map.Entry<String, Double> entry : tf.entrySet()) {
+				String lemma = entry.getKey();
+				Double tfreq = entry.getValue();
+				double cscore = tfreq * Math.log((double) noDocs / df.get(lemma));
+				if(set.size() < BEST_TFIDF)
+					set.add(new Tuple(cscore, lemma));
+				else if(set.first().score < cscore)
+				{
+					set.remove(set.first());
+					set.add(new Tuple(cscore, lemma));
 				}
 			}
 
@@ -92,6 +146,7 @@ public class SummaryGenerator {
 			double maxSentenceScore = 0;
 			String bestSentence = null;
 			for (CoreMap sentence : sentences) {
+				int numBestWords = 0;
 				double cscore, sentenceScore = 0;
 				StringBuilder sentenceString = new StringBuilder();
 				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
@@ -107,22 +162,26 @@ public class SummaryGenerator {
 					if (!CLOSED_CLASS.contains(pos)
 							&& !PUNCTUATION.contains(pos)) {
 						sentenceString.append(word).append(' ');
-						
-						cscore = Math.log(tf.get(lemma) + 1)
-								* Math.log((double) noDocs / df.get(lemma));
-						sentenceScore += cscore;
-                                        }
-                                }
+
+						cscore = tf.get(lemma) * Math.log((double) noDocs / df.get(lemma));
+						if(cscore >= set.first().score)
+						{
+							sentenceScore += cscore;
+							++numBestWords;
+						}
+					}
+				}
+				sentenceScore /= numBestWords;
 				if (sentenceScore > maxSentenceScore) {
-				        maxSentenceScore = sentenceScore;
+					maxSentenceScore = sentenceScore;
 					bestSentence = sentenceString.toString();
 				}
 			}
 			try {
 				// For java garbage collector
 				annotations.set(i, null);
-				compressSentence(bestSentence.toString());
-				out.write(bestSentence.toString());
+				String compressedSentence = compressSentence(bestSentence.toString());
+				out.write(compressedSentence);
 				out.close();
 			} catch (IOException e) {
 				System.out.println("Error at writing in file: " + bestSentence);
@@ -180,10 +239,10 @@ public class SummaryGenerator {
 			text = root.getFirstChildElement("TEXT").getValue();
 		} catch (nu.xom.ParsingException ex) {
 			System.err
-					.println("Cafe con Leche is malformed today. How embarrassing!");
+			.println("Cafe con Leche is malformed today. How embarrassing!");
 		} catch (IOException ex) {
 			System.err
-					.println("Could not connect to Cafe con Leche. The site may be down.");
+			.println("Could not connect to Cafe con Leche. The site may be down.");
 		}
 
 		if (text == null) {
@@ -219,7 +278,7 @@ public class SummaryGenerator {
 					if (df.containsKey(lemma))
 						df.put(lemma, df.get(lemma) + 1);
 					else
-						df.put(lemma, 1);
+						df.put(lemma, new Double(1));
 				}
 			}
 
@@ -279,33 +338,32 @@ public class SummaryGenerator {
 		sentence.replaceAll("^A ", " ");
 		sentence.replaceAll("^the ", " ");
 		sentence.replaceAll("^The ", " ");
-		
+
 		if(sentence.length() < MAX_LENGTH) return sentence;
-		
+
 		// Remove initial adverbials
 		if(sentence.startsWith("On the other hand "))
 			sentence = sentence.substring(17);
 		if(sentence.startsWith("For example "))
 			sentence = sentence.substring(11);
-		
+
 		if(sentence.length() < MAX_LENGTH) return sentence;
-		
+
 		Annotation document = new Annotation(sentence);
 		pipelineCompress.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		Tree tree = sentences.get(0).get(TreeAnnotation.class);
-		 
+
 		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
-		
+
 		// Remove leaves from dependency graph
-		/*
 		Set<IndexedWord> leaves = dependencies.getLeafVertices();
 		for(IndexedWord leaf: leaves)
 			dependencies.removeVertex(leaf);
-		
+
 		String trimmedSentence = dependencies.toRecoveredSentenceString();
-		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;*/
-		
+		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;
+
 		// Remove temporals, abbreviations and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
@@ -317,7 +375,7 @@ public class SummaryGenerator {
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARATAXIS));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.CONJUNCT ));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.COORDINATION ));
-		
+
 		for(SemanticGraphEdge edge : listDep)
 		{
 			IndexedWord w = edge.getDependent();
