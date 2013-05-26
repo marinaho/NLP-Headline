@@ -17,6 +17,7 @@ public class SummaryGenerator {
 	
 	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit";
 	private final static String ADD_REST_PROPERTIES = ", pos, lemma";
+	private final static String COMPRESS_PROPERTIES = "tokenize, ssplit, pos, parse";
 	
 	private static final String[] PUNCTUATION_VALUES = new String[] {"$", "``", "''", "(", ")", ",", "--", ".", ":"};
 	private final static HashSet<String> PUNCTUATION = new HashSet<String>(Arrays.asList(PUNCTUATION_VALUES));
@@ -87,17 +88,19 @@ public class SummaryGenerator {
 				{
 					String lemma = token.get(LemmaAnnotation.class);
 					String pos = token.get(PartOfSpeechAnnotation.class);
-
 					cscore = Math.log(tf.get(lemma) + 1) * Math.log((double)noDocs / df.get(lemma));
 					sentenceScore += cscore;
-					if(sentenceScore > maxSentenceScore)
-					{
-						maxSentenceScore = sentenceScore;
-						bestSentence = sentence;
-					}
+				}
+				if(sentenceScore > maxSentenceScore)
+				{
+					maxSentenceScore = sentenceScore;
+					bestSentence = sentence;
 				}
 			}
 			try {
+				// For java garbage collector
+				annotations.set(i, null);
+				compressSentence(bestSentence.toString());
 				out.write(bestSentence.toString());
 				out.close();
 			} catch (IOException e) {
@@ -253,4 +256,16 @@ public class SummaryGenerator {
 		// Map<Integer, CorefChain> graph = document
 		// .get(CorefChainAnnotation.class);
 	}
+	private String compressSentence(String sentence) {
+		Properties props = new Properties();
+		props.put("annotators", COMPRESS_PROPERTIES);
+		StanfordCoreNLP pipeline = new StanfordCoreNLP(props);
+		
+		Annotation document = new Annotation(sentence);
+		pipeline.annotate(document);
+		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
+		Tree tree = sentences.get(0).get(TreeAnnotation.class);
+		System.out.println(tree);
+		return sentence;
+	}	 
 }
