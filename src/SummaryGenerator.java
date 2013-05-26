@@ -52,7 +52,7 @@ public class SummaryGenerator {
 			Arrays.asList(PUNCTUATION_VALUES));
 	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
 		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
-	private final static int BEST_TFIDF = 10;
+	private final static int BEST_TFIDF = 20;
 
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
 			Arrays.asList(CLOSED_CLASS_VALUES));
@@ -123,7 +123,7 @@ public class SummaryGenerator {
 						sentenceString.append(word).append(' ');
 					}
 				}
-				bestSentence = compressSentence(sentenceString.toString());
+				bestSentence = sentenceString.toString();
 			} 
 			else {
 				//Compute TF-IDF per sentence
@@ -159,12 +159,13 @@ public class SummaryGenerator {
 						set.add(new Tuple(cscore, lemma));
 					}
 				}
-
+				
+				double maxSentenceScore = 0;
 				for (CoreMap sentence : sentences) {
 					int numBestWords = 0;
 					double cscore, sentenceScore = 0;
 					// Compute sentence with best score
-					double maxSentenceScore = 0;
+					
 					StringBuilder sentenceString = new StringBuilder();
 					for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 						String lemma = token.get(LemmaAnnotation.class);
@@ -186,17 +187,18 @@ public class SummaryGenerator {
 						}
 					}
 
-					if (sentenceScore > maxSentenceScore) {
+					if (sentenceScore >= maxSentenceScore) {
 						maxSentenceScore = sentenceScore;
 						bestSentence = sentenceString.toString();
 					}
 				}
 			}
 
+			// For java garbage collector
+			annotations.set(i, null);
+			String compressedSentence = compressSentence(bestSentence.toString());
+			
 			try {
-				// For java garbage collector
-				annotations.set(i, null);
-				String compressedSentence = compressSentence(bestSentence.toString());
 				out.write(compressedSentence);
 				out.close();
 			} catch (IOException e) {
