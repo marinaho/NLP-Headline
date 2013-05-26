@@ -303,8 +303,6 @@ public class SummaryGenerator {
 			System.out.println("Removin " + w);
 			dependencies.removeVertex(w);
 		}
-		System.out.println(dependencies.toRecoveredSentenceString());
-		
-		return sentence;
+		return dependencies.toRecoveredSentenceString();
 	}	 
 }
