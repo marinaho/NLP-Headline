@@ -1,13 +1,10 @@
 import java.io.*;
 import java.util.*;
 
-import edu.stanford.nlp.dcoref.CorefChain;
-import edu.stanford.nlp.dcoref.CorefCoreAnnotations.CorefChainAnnotation;
 import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 import edu.stanford.nlp.pipeline.*;
 import edu.stanford.nlp.trees.*;
-import edu.stanford.nlp.trees.TreeCoreAnnotations.*;
 import edu.stanford.nlp.trees.semgraph.*;
 import edu.stanford.nlp.trees.semgraph.SemanticGraphCoreAnnotations.*;
 import edu.stanford.nlp.util.*;
@@ -55,7 +52,6 @@ public class SummaryGenerator {
 			Arrays.asList(PUNCTUATION_VALUES));
 	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
 		"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
-
 	private final static int BEST_TFIDF = 10;
 
 	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
@@ -94,8 +90,8 @@ public class SummaryGenerator {
 		pipelineCompress = new StanfordCoreNLP(propsCompress);
 	}
 
-	public void scoreAndResults() {
-		// Compute TF-IDF per sentence
+	public void scoreAndResults(boolean firstSentence) {
+
 		for (int i = 0; i < annotations.size(); ++i) {
 			BufferedWriter out = null;
 			try {
@@ -106,51 +102,16 @@ public class SummaryGenerator {
 				e.printStackTrace();
 			}
 
-			// Compute term frequency scores for each word
 			Annotation an = annotations.get(i);
 			List<CoreMap> sentences = an.get(SentencesAnnotation.class);
-			HashMap<String, Double> tf = new HashMap<String, Double>();
-			TreeSet<Tuple> set = new TreeSet<Tuple>();
 
-			for (CoreMap sentence : sentences) {
-				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-					String lemma = token.get(LemmaAnnotation.class);
-					String pos = null;
-					if (posTag) {
-						pos = token.get(PartOfSpeechAnnotation.class);
-					}
-					if (CLOSED_CLASS.contains(pos) || PUNCTUATION.contains(pos)) continue;
-
-					if (tf.containsKey(lemma))
-						tf.put(lemma, tf.get(lemma) + 1);
-					else
-						tf.put(lemma, new Double(1));
-				}
-			}
-
-			// Compute top scoring words
-			for (Map.Entry<String, Double> entry : tf.entrySet()) {
-				String lemma = entry.getKey();
-				Double tfreq = entry.getValue();
-				double cscore = tfreq * Math.log((double) noDocs / df.get(lemma));
-				if(set.size() < BEST_TFIDF)
-					set.add(new Tuple(cscore, lemma));
-				else if(set.first().score < cscore)
-				{
-					set.remove(set.first());
-					set.add(new Tuple(cscore, lemma));
-				}
-			}
-
-			// Compute sentence with best score
-			double maxSentenceScore = 0;
 			String bestSentence = null;
-			for (CoreMap sentence : sentences) {
-				int numBestWords = 0;
-				double cscore, sentenceScore = 0;
+			if (firstSentence) {
+				CoreMap sentence = sentences.get(0);
 				StringBuilder sentenceString = new StringBuilder();
-				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-					String lemma = token.get(LemmaAnnotation.class);
+
+				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {			
+					// this is the text of the token
 					String word = token.get(TextAnnotation.class);
 
 					String pos = null;
@@ -158,25 +119,80 @@ public class SummaryGenerator {
 						// this is the POS tag of the token
 						pos = token.get(PartOfSpeechAnnotation.class);
 					}
-
-					if (!CLOSED_CLASS.contains(pos)
-							&& !PUNCTUATION.contains(pos)) {
+					if (!CLOSED_CLASS.contains(pos) && !PUNCTUATION.contains(pos)) {
 						sentenceString.append(word).append(' ');
-
-						cscore = tf.get(lemma) * Math.log((double) noDocs / df.get(lemma));
-						if(cscore >= set.first().score)
-						{
-							sentenceScore += cscore;
-							++numBestWords;
-						}
 					}
 				}
-				sentenceScore /= numBestWords;
-				if (sentenceScore > maxSentenceScore) {
-					maxSentenceScore = sentenceScore;
-					bestSentence = sentenceString.toString();
+				bestSentence = compressSentence(sentenceString.toString());
+			} 
+			else {
+				//Compute TF-IDF per sentence
+				HashMap<String, Double> tf = new HashMap<String, Double>();
+				TreeSet<Tuple> set = new TreeSet<Tuple>();
+
+				for (CoreMap sentence : sentences) {
+					for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
+						String lemma = token.get(LemmaAnnotation.class);
+						String pos = null;
+						if (posTag) {
+							pos = token.get(PartOfSpeechAnnotation.class);
+						}
+						if (CLOSED_CLASS.contains(pos) || PUNCTUATION.contains(pos)) continue;
+
+						if (tf.containsKey(lemma))
+							tf.put(lemma, tf.get(lemma) + 1);
+						else
+							tf.put(lemma, new Double(1));
+					}
+				}
+
+				// Compute top scoring words
+				for (Map.Entry<String, Double> entry : tf.entrySet()) {
+					String lemma = entry.getKey();
+					Double tfreq = entry.getValue();
+					double cscore = tfreq * Math.log((double) noDocs / df.get(lemma));
+					if(set.size() < BEST_TFIDF)
+						set.add(new Tuple(cscore, lemma));
+					else if(set.first().score < cscore)
+					{
+						set.remove(set.first());
+						set.add(new Tuple(cscore, lemma));
+					}
+				}
+
+				for (CoreMap sentence : sentences) {
+					int numBestWords = 0;
+					double cscore, sentenceScore = 0;
+					// Compute sentence with best score
+					double maxSentenceScore = 0;
+					StringBuilder sentenceString = new StringBuilder();
+					for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
+						String lemma = token.get(LemmaAnnotation.class);
+						String word = token.get(TextAnnotation.class);
+
+						String pos = null;
+						if (posTag) {
+							// this is the POS tag of the token
+							pos = token.get(PartOfSpeechAnnotation.class);
+						}
+
+						if (!CLOSED_CLASS.contains(pos)
+								&& !PUNCTUATION.contains(pos)) {
+							sentenceString.append(word).append(' ');
+							cscore = Math.log(tf.get(lemma) + 1)
+									* Math.log((double) noDocs / df.get(lemma));
+							if(cscore >= set.first().score)
+								sentenceScore += cscore;
+						}
+					}
+
+					if (sentenceScore > maxSentenceScore) {
+						maxSentenceScore = sentenceScore;
+						bestSentence = sentenceString.toString();
+					}
 				}
 			}
+
 			try {
 				// For java garbage collector
 				annotations.set(i, null);
@@ -284,50 +300,8 @@ public class SummaryGenerator {
 
 		// Store annotation and filename in vectors at same index
 		annotations.add(document);
-
-		/*
-		 * Return first sentence CoreMap sentence = sentences.get(0);
-		 * StringBuilder firstSentence = new StringBuilder(); // traversing the
-		 * words in the current sentence // a CoreLabel is a CoreMap with
-		 * additional token-specific methods for (CoreLabel token :
-		 * sentence.get(TokensAnnotation.class)) { // this is the text of the
-		 * token String word = token.get(TextAnnotation.class);
-		 * 
-		 * String pos = null; if (posTag) { // this is the POS tag of the token
-		 * pos = token.get(PartOfSpeechAnnotation.class); } if
-		 * (!CLOSED_CLASS.contains(pos) && !PUNCTUATION.contains(pos)) {
-		 * firstSentence.append(word).append(' '); } } return
-		 * firstSentence.toString();
-		 */
-
-		// TODO: remove
-		// for (CoreMap sentence : sentences) {
-		// // traversing the words in the current sentence
-		// // a CoreLabel is a CoreMap with additional token-specific methods
-		// for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
-		// // this is the text of the token
-		// String word = token.get(TextAnnotation.class);
-		// // this is the POS tag of the token
-		// String pos = token.get(PartOfSpeechAnnotation.class);
-		// // this is the NER label of the token
-		// String ne = token.get(NamedEntityTagAnnotation.class);
-		// }
-		//
-		// // this is the parse tree of the current sentence
-		// Tree tree = sentence.get(TreeAnnotation.class);
-		//
-		// // this is the Stanford dependency graph of the current sentence
-		// SemanticGraph dependencies = sentence
-		// .get(CollapsedCCProcessedDependenciesAnnotation.class);
-		// }
-		//
-		// // This is the coreference link graph
-		// // Each chain stores a set of mentions that link to each other,
-		// // along with a method for getting the most representative mention
-		// // Both sentence and token offsets start at 1!
-		// Map<Integer, CorefChain> graph = document
-		// .get(CorefChainAnnotation.class);
 	}
+
 	private String compressSentence(String sentence) {
 		// Remove "a" and "the" determiners
 		sentence.replaceAll(" a ", " ");
@@ -339,26 +313,28 @@ public class SummaryGenerator {
 		sentence.replaceAll("^the ", " ");
 		sentence.replaceAll("^The ", " ");
 
-		if(sentence.length() < MAX_LENGTH) return sentence;
+		if (sentence.length() < MAX_LENGTH)
+			return sentence;
 
 		// Remove initial adverbials
-		if(sentence.startsWith("On the other hand "))
+		if (sentence.startsWith("On the other hand "))
 			sentence = sentence.substring(17);
-		if(sentence.startsWith("For example "))
+		if (sentence.startsWith("For example "))
 			sentence = sentence.substring(11);
 
-		if(sentence.length() < MAX_LENGTH) return sentence;
+		if (sentence.length() < MAX_LENGTH)
+			return sentence;
 
 		Annotation document = new Annotation(sentence);
 		pipelineCompress.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
-		Tree tree = sentences.get(0).get(TreeAnnotation.class);
 
-		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
+		SemanticGraph dependencies = sentences.get(0).get(
+				CollapsedCCProcessedDependenciesAnnotation.class);
 
 		// Remove leaves from dependency graph
 		Set<IndexedWord> leaves = dependencies.getLeafVertices();
-		for(IndexedWord leaf: leaves)
+		for (IndexedWord leaf : leaves)
 			dependencies.removeVertex(leaf);
 
 		String trimmedSentence = dependencies.toRecoveredSentenceString();
@@ -383,6 +359,6 @@ public class SummaryGenerator {
 		}
 		// System.out.println(dependencies.toRecoveredSentenceString());
 		return dependencies.toRecoveredSentenceString();
-	}	 
+	}
 }
 
