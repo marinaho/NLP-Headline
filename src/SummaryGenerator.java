@@ -15,31 +15,35 @@ import edu.stanford.nlp.util.*;
 public class SummaryGenerator {
 	private final static int MAX_LENGTH = 75;
 	
-	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit";
-	private final static String ADD_REST_PROPERTIES = ", pos, lemma";
-	private final static String COMPRESS_PROPERTIES = "tokenize, ssplit, pos, parse";
-	
-	private static final String[] PUNCTUATION_VALUES = new String[] {"$", "``", "''", "(", ")", ",", "--", ".", ":"};
-	private final static HashSet<String> PUNCTUATION = new HashSet<String>(Arrays.asList(PUNCTUATION_VALUES));
-	private static final String[] CLOSED_CLASS_VALUES = new String[] {"CC", "CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD"};
-	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(Arrays.asList(CLOSED_CLASS_VALUES));
-	
+	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit, pos, lemma";
+	private final static String ADD_REST_PROPERTIES = "";
+
+	private static final String[] PUNCTUATION_VALUES = new String[] { "$",
+			"``", "''", "(", ")", ",", "--", ".", ":" };
+	private final static HashSet<String> PUNCTUATION = new HashSet<String>(
+			Arrays.asList(PUNCTUATION_VALUES));
+	private static final String[] CLOSED_CLASS_VALUES = new String[] { "CC",
+			"CD", "IN", "DT", "RP", "PRP", "PRP$", "WP", "WP$", "MD", "CD" };
+	private final static HashSet<String> CLOSED_CLASS = new HashSet<String>(
+			Arrays.asList(CLOSED_CLASS_VALUES));
+
 	private final StanfordCoreNLP pipeline;
-	
+
 	private final String inputDir;
 	private final String outputDir;
 	private final boolean posTag;
-	
+
 	private static int noDocs = 0;
 	private static HashMap<String, Integer> df = new HashMap<String, Integer>();
 	private static ArrayList<Annotation> annotations = new ArrayList<Annotation>();
 	private static ArrayList<String> outNames = new ArrayList<String>();
 
-	public SummaryGenerator(final String inputDir, final String outputDir, boolean posTag) {
+	public SummaryGenerator(final String inputDir, final String outputDir,
+			boolean posTag) {
 		this.inputDir = inputDir;
 		this.outputDir = outputDir;
 		this.posTag = posTag;
-		
+
 		// creates a StanfordCoreNLP object, with POS tagging, lemmatization,
 		// NER, parsing, and coreference resolution
 		Properties props = new Properties();
@@ -51,50 +55,61 @@ public class SummaryGenerator {
 		// "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 		pipeline = new StanfordCoreNLP(props);
 	}
+
 	public void scoreAndResults() {
 		// Compute TF-IDF per sentence
-		for(int i = 0; i < annotations.size(); ++i)
-		{			
+		for (int i = 0; i < annotations.size(); ++i) {
 			BufferedWriter out = null;
 			try {
-				out = new BufferedWriter(new FileWriter(outNames.get(i).toString()));
+				out = new BufferedWriter(new FileWriter(outNames.get(i)
+						.toString()));
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
 			}
-			
+
 			// Compute term frequency scores for each word
 			Annotation an = annotations.get(i);
 			List<CoreMap> sentences = an.get(SentencesAnnotation.class);
 			HashMap<String, Integer> tf = new HashMap<String, Integer>();
-			for(CoreMap sentence: sentences)
-			{
-				for(CoreLabel token: sentence.get(TokensAnnotation.class))
-				{
+			for (CoreMap sentence : sentences) {
+				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 					String lemma = token.get(LemmaAnnotation.class);
-					if(tf.containsKey(lemma))
+					if (tf.containsKey(lemma))
 						tf.put(lemma, tf.get(lemma) + 1);
-					else tf.put(lemma, 1);
+					else
+						tf.put(lemma, 1);
 				}
 			}
-			
+
 			// Compute sentence with best score
 			double maxSentenceScore = 0;
-			CoreMap bestSentence = null;
-			for(CoreMap sentence : sentences)
-			{
+			String bestSentence = null;
+			for (CoreMap sentence : sentences) {
 				double cscore, sentenceScore = 0;
-				for(CoreLabel token: sentence.get(TokensAnnotation.class))
-				{
+				StringBuilder sentenceString = new StringBuilder();
+				for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 					String lemma = token.get(LemmaAnnotation.class);
-					String pos = token.get(PartOfSpeechAnnotation.class);
-					cscore = Math.log(tf.get(lemma) + 1) * Math.log((double)noDocs / df.get(lemma));
-					sentenceScore += cscore;
-				}
-				if(sentenceScore > maxSentenceScore)
-				{
-					maxSentenceScore = sentenceScore;
-					bestSentence = sentence;
+					String word = token.get(TextAnnotation.class);
+
+					String pos = null;
+					if (posTag) {
+						// this is the POS tag of the token
+						pos = token.get(PartOfSpeechAnnotation.class);
+					}
+
+					if (!CLOSED_CLASS.contains(pos)
+							&& !PUNCTUATION.contains(pos)) {
+						sentenceString.append(word).append(' ');
+						
+						cscore = Math.log(tf.get(lemma) + 1)
+								* Math.log((double) noDocs / df.get(lemma));
+						sentenceScore += cscore;
+                                        }
+                                }
+				if (sentenceScore > maxSentenceScore) {
+				        maxSentenceScore = sentenceScore;
+					bestSentence = sentenceString.toString();
 				}
 			}
 			try {
@@ -159,10 +174,10 @@ public class SummaryGenerator {
 			text = root.getFirstChildElement("TEXT").getValue();
 		} catch (nu.xom.ParsingException ex) {
 			System.err
-			.println("Cafe con Leche is malformed today. How embarrassing!");
+					.println("Cafe con Leche is malformed today. How embarrassing!");
 		} catch (IOException ex) {
 			System.err
-			.println("Could not connect to Cafe con Leche. The site may be down.");
+					.println("Could not connect to Cafe con Leche. The site may be down.");
 		}
 
 		if (text == null) {
@@ -186,47 +201,39 @@ public class SummaryGenerator {
 		// has values with custom types
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 
-		// indicates if a word is present in current document 
+		// indicates if a word is present in current document
 		HashMap<String, Boolean> hasTerm = new HashMap<String, Boolean>();
-		
+
 		// process tokens to get document frequency
-		for(CoreMap sentence: sentences)
-			for(CoreLabel token: sentence.get(TokensAnnotation.class))
-			{
+		for (CoreMap sentence : sentences)
+			for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 				String lemma = token.getString(LemmaAnnotation.class);
-				if(!hasTerm.containsKey(lemma))
-				{
+				if (!hasTerm.containsKey(lemma)) {
 					hasTerm.put(lemma, true);
-					if(df.containsKey(lemma))
+					if (df.containsKey(lemma))
 						df.put(lemma, df.get(lemma) + 1);
-					else df.put(lemma, 1);
+					else
+						df.put(lemma, 1);
 				}
 			}
-		
+
 		// Store annotation and filename in vectors at same index
 		annotations.add(document);
-		
-		
-		/* 
-		 * Return first sentence
-		 * CoreMap sentence = sentences.get(0);
-		StringBuilder firstSentence = new StringBuilder();
-		// traversing the words in the current sentence
-		// a CoreLabel is a CoreMap with additional token-specific methods
-		for (CoreLabel token : sentence.get(TokensAnnotation.class)) {			
-			// this is the text of the token
-			String word = token.get(TextAnnotation.class);
-			
-			String pos = null;
-			if (posTag) {
-				// this is the POS tag of the token
-				pos = token.get(PartOfSpeechAnnotation.class);
-			}
-			if (!CLOSED_CLASS.contains(pos) && !PUNCTUATION.contains(pos)) {
-				firstSentence.append(word).append(' ');
-			}
-		}
-		return firstSentence.toString(); */
+
+		/*
+		 * Return first sentence CoreMap sentence = sentences.get(0);
+		 * StringBuilder firstSentence = new StringBuilder(); // traversing the
+		 * words in the current sentence // a CoreLabel is a CoreMap with
+		 * additional token-specific methods for (CoreLabel token :
+		 * sentence.get(TokensAnnotation.class)) { // this is the text of the
+		 * token String word = token.get(TextAnnotation.class);
+		 * 
+		 * String pos = null; if (posTag) { // this is the POS tag of the token
+		 * pos = token.get(PartOfSpeechAnnotation.class); } if
+		 * (!CLOSED_CLASS.contains(pos) && !PUNCTUATION.contains(pos)) {
+		 * firstSentence.append(word).append(' '); } } return
+		 * firstSentence.toString();
+		 */
 
 		// TODO: remove
 		// for (CoreMap sentence : sentences) {
