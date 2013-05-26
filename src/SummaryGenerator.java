@@ -180,8 +180,7 @@ public class SummaryGenerator {
 						if (!CLOSED_CLASS.contains(pos)
 								&& !PUNCTUATION.contains(pos)) {
 							sentenceString.append(word).append(' ');
-							cscore = Math.log(tf.get(lemma) + 1)
-									* Math.log((double) noDocs / df.get(lemma));
+							cscore = tf.get(lemma) * Math.log((double) noDocs / df.get(lemma));
 							if(cscore >= set.first().score)
 								sentenceScore += cscore;
 						}
