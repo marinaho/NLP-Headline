@@ -1,4 +1,4 @@
-*.class
+bin/*.class
 
 # Package Files #
 *.war
