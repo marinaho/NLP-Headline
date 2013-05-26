@@ -16,7 +16,7 @@ public class SummaryGenerator {
 	private final static int MAX_LENGTH = 75;
 	
 	private final static String DEFAULT_PROPERTIES = "tokenize, ssplit";
-	private final static String ADD_REST_PROPERTIES = ", pos";
+	private final static String ADD_REST_PROPERTIES = ", pos, lemma";
 	
 	private static final String[] PUNCTUATION_VALUES = new String[] {"$", "``", "''", "(", ")", ",", "--", ".", ":"};
 	private final static HashSet<String> PUNCTUATION = new HashSet<String>(Arrays.asList(PUNCTUATION_VALUES));
@@ -28,6 +28,11 @@ public class SummaryGenerator {
 	private final String inputDir;
 	private final String outputDir;
 	private final boolean posTag;
+	
+	private static int noDocs = 0;
+	private static HashMap<String, Integer> df = new HashMap<String, Integer>();
+	private static ArrayList<Annotation> annotations = new ArrayList<Annotation>();
+	private static ArrayList<String> outNames = new ArrayList<String>();
 
 	public SummaryGenerator(final String inputDir, final String outputDir, boolean posTag) {
 		this.inputDir = inputDir;
@@ -45,6 +50,61 @@ public class SummaryGenerator {
 		// "tokenize, ssplit, pos, lemma, ner, parse, dcoref");
 		pipeline = new StanfordCoreNLP(props);
 	}
+	public void scoreAndResults() {
+		// Compute TF-IDF per sentence
+		for(int i = 0; i < annotations.size(); ++i)
+		{			
+			BufferedWriter out = null;
+			try {
+				out = new BufferedWriter(new FileWriter(outNames.get(i).toString()));
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+			// Compute term frequency scores for each word
+			Annotation an = annotations.get(i);
+			List<CoreMap> sentences = an.get(SentencesAnnotation.class);
+			HashMap<String, Integer> tf = new HashMap<String, Integer>();
+			for(CoreMap sentence: sentences)
+			{
+				for(CoreLabel token: sentence.get(TokensAnnotation.class))
+				{
+					String word = token.get(TextAnnotation.class);
+					if(tf.containsKey(word))
+						tf.put(word, tf.get(word) + 1);
+					else tf.put(word, 1);
+				}
+			}
+			
+			// Compute sentence with best score
+			double maxSentenceScore = 0;
+			CoreMap bestSentence = null;
+			for(CoreMap sentence : sentences)
+			{
+				double cscore, sentenceScore = 0;
+				for(CoreLabel token: sentence.get(TokensAnnotation.class))
+				{
+					String word = token.get(TextAnnotation.class);
+					String pos = token.get(PartOfSpeechAnnotation.class);
+
+					cscore = Math.log(tf.get(word) + 1) * Math.log((double)noDocs / df.get(word));
+					sentenceScore += cscore;
+					if(sentenceScore > maxSentenceScore)
+					{
+						maxSentenceScore = sentenceScore;
+						bestSentence = sentence;
+					}
+				}
+			}
+			try {
+				out.write(bestSentence.toString());
+				out.close();
+			} catch (IOException e) {
+				System.out.println("Error at writing in file: " + bestSentence);
+			}
+		}
+	}
 
 	public void processAllFiles() {
 		File input = new File(inputDir);
@@ -57,28 +117,21 @@ public class SummaryGenerator {
 
 		for (final File dir : dirs) {
 			for (final File file : dir.listFiles()) {
-				String firstSentence = processSingleFile(file);
+				++noDocs;
+				processSingleFile(file);
 
-				BufferedWriter out = null;
 				StringBuilder outName = new StringBuilder(outputDir);
 				outName.append("/");
 				outName.append(dir.getName().toUpperCase()
 						.substring(0, dir.getName().length() - 1));
 				outName.append(".P.10.T.1.");
 				outName.append(file.getName());
-				try {
-					out = new BufferedWriter(new FileWriter(outName.toString()));
-					out.write(firstSentence.substring(0, Math.min(firstSentence.length(), MAX_LENGTH)));
-					out.close();
-				} catch (IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+				outNames.add(outName.toString());
 			}
 		}
 	}
 
-	private String processSingleFile(final File file) {
+	private void processSingleFile(final File file) {
 		// read XML contents from file
 		Scanner s = null;
 		try {
@@ -110,14 +163,15 @@ public class SummaryGenerator {
 		}
 
 		if (text == null) {
-			return null;
+			return;
 		}
 
-		return parseText(text);
+		parseText(text);
 	}
 
 	// method partially inspired by an example on the Stanford Core NLP website
-	private String parseText(final String text) {
+	// annotates and computes document frequency scores for each word
+	private void parseText(final String text) {
 		// create an empty Annotation just with the given text
 		Annotation document = new Annotation(text);
 
@@ -129,8 +183,30 @@ public class SummaryGenerator {
 		// has values with custom types
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 
-		// return first sentence
-		CoreMap sentence = sentences.get(0);
+		// indicates if a word is present in current document 
+		HashMap<String, Boolean> hasTerm = new HashMap<String, Boolean>();
+		
+		// process tokens to get document frequency
+		for(CoreMap sentence: sentences)
+			for(CoreLabel token: sentence.get(TokensAnnotation.class))
+			{
+				String word = token.getString(TextAnnotation.class);
+				if(!hasTerm.containsKey(word))
+				{
+					hasTerm.put(word, true);
+					if(df.containsKey(word))
+						df.put(word, df.get(word) + 1);
+					else df.put(word, 1);
+				}
+			}
+		
+		// Store annotation and filename in vectors at same index
+		annotations.add(document);
+		
+		
+		/* 
+		 * Return first sentence
+		 * CoreMap sentence = sentences.get(0);
 		StringBuilder firstSentence = new StringBuilder();
 		// traversing the words in the current sentence
 		// a CoreLabel is a CoreMap with additional token-specific methods
@@ -147,8 +223,7 @@ public class SummaryGenerator {
 				firstSentence.append(word).append(' ');
 			}
 		}
-
-		return firstSentence.toString();
+		return firstSentence.toString(); */
 
 		// TODO: remove
 		// for (CoreMap sentence : sentences) {

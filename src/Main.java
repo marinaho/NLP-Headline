@@ -6,5 +6,6 @@ public class Main {
 	public static void main(String[] args) {
 		SummaryGenerator sg = new SummaryGenerator(defaultInput, defaultOutput, true);
 		sg.processAllFiles();
+		sg.scoreAndResults();
 	}
 }
