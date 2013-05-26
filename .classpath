@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="marina"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="lib/joda-time-2.1-sources.jar"/>
+	<classpathentry kind="lib" path="lib/joda-time.jar"/>
+	<classpathentry kind="lib" path="lib/jollyday-0.4.7-sources.jar"/>
+	<classpathentry kind="lib" path="lib/jollyday.jar"/>
+	<classpathentry kind="lib" path="lib/stanford-corenlp-1.3.4-javadoc.jar"/>
+	<classpathentry kind="lib" path="lib/stanford-corenlp-1.3.4-models.jar"/>
+	<classpathentry kind="lib" path="lib/stanford-corenlp-1.3.4-sources.jar"/>
+	<classpathentry kind="lib" path="lib/stanford-corenlp-1.3.4.jar"/>
+	<classpathentry kind="lib" path="lib/xom.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
