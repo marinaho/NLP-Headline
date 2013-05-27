@@ -6,9 +6,9 @@ ROUGE_FILE="temp"
 ROUGE_INPUT="$ROUGE_FILE.rouge.in"
 ROUGE_OUTPUT="$ROUGE_FILE.rouge.out"
 
-echo "Copy summaries"
+echo "Move summaries"
 rm $PEERS/*
-cp output/* $PEERS
+mv output/* $PEERS
 
 echo "Construct ROUGE input file"
 cd eval

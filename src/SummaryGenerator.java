@@ -195,9 +195,10 @@ public class SummaryGenerator {
 							sentenceString.append(word).append(' ');
 							cscore = Math.log(tf.get(lemma) + 1)
 									* Math.log((double) noDocs / df.get(lemma));
+							// TODO(uvictor): why was the score updated only if it was higher?
+							sentenceScore += cscore;
 							if (cscore >= set.first().score) {
 								++nBest;
-								sentenceScore += cscore;
 							}
 						}
 					}
