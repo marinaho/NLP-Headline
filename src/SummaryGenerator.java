@@ -90,7 +90,7 @@ public class SummaryGenerator {
 		pipelineCompress = new StanfordCoreNLP(propsCompress);
 	}
 
-	public void scoreAndResults(boolean firstSentence) {
+	public void scoreAndResults(boolean firstSentence, boolean compressTag) {
 
 		for (int i = 0; i < annotations.size(); ++i) {
 			BufferedWriter out = null;
@@ -127,10 +127,11 @@ public class SummaryGenerator {
 			} 
 			else {
 				//Compute TF-IDF per sentence
-				HashMap<String, Double> tf = new HashMap<String, Double>();
-				TreeSet<Tuple> set = new TreeSet<Tuple>();
-
+				double maxSentenceScore = 0;
 				for (CoreMap sentence : sentences) {
+					HashMap<String, Double> tf = new HashMap<String, Double>();
+					TreeSet<Tuple> set = new TreeSet<Tuple>();
+	
 					for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 						String lemma = token.get(LemmaAnnotation.class);
 						String pos = null;
@@ -144,27 +145,24 @@ public class SummaryGenerator {
 						else
 							tf.put(lemma, new Double(1));
 					}
-				}
 
-				// Compute top scoring words
-				for (Map.Entry<String, Double> entry : tf.entrySet()) {
-					String lemma = entry.getKey();
-					Double tfreq = entry.getValue();
-					double cscore = tfreq * Math.log((double) noDocs / df.get(lemma));
-					if(set.size() < BEST_TFIDF)
-						set.add(new Tuple(cscore, lemma));
-					else if(set.first().score < cscore)
-					{
-						set.remove(set.first());
-						set.add(new Tuple(cscore, lemma));
+					// Compute top scoring words
+					for (Map.Entry<String, Double> entry : tf.entrySet()) {
+						String lemma = entry.getKey();
+						Double tfreq = entry.getValue();
+						double cscore = Math.log(tfreq + 1) * Math.log((double) noDocs / df.get(lemma));
+						if(set.size() < BEST_TFIDF)
+							set.add(new Tuple(cscore, lemma));
+						else if(set.first().score < cscore)
+						{
+							set.remove(set.first());
+							set.add(new Tuple(cscore, lemma));
+						}
 					}
-				}
 				
-				double maxSentenceScore = 0;
-				for (CoreMap sentence : sentences) {
+				
+					int nBest = 0;
 					double cscore, sentenceScore = 0;
-					// Compute sentence with best score
-					
 					StringBuilder sentenceString = new StringBuilder();
 					for (CoreLabel token : sentence.get(TokensAnnotation.class)) {
 						String lemma = token.get(LemmaAnnotation.class);
@@ -179,9 +177,13 @@ public class SummaryGenerator {
 						if (!CLOSED_CLASS.contains(pos)
 								&& !PUNCTUATION.contains(pos)) {
 							sentenceString.append(word).append(' ');
-							cscore = tf.get(lemma) * Math.log((double) noDocs / df.get(lemma));
-							if(cscore >= set.first().score)
-								sentenceScore += cscore;
+							cscore = Math.log(tf.get(lemma)+1) * Math.log((double) noDocs / df.get(lemma));
+							sentenceScore += cscore;
+							/*if(cscore >= set.first().score)
+							{
+								++nBest;
+								sentenceScore = Math.max(sentenceScore, cscore);
+							}*/
 						}
 					}
 
@@ -195,7 +197,7 @@ public class SummaryGenerator {
 			// For java garbage collector
 			annotations.set(i, null);
 			// System.out.println("before compress " + bestSentence);
-			bestSentence = compressSentence(bestSentence);
+			if(compressTag) bestSentence = compressSentence(bestSentence);
 			// System.out.println("after compress " + bestSentence);
 			
 			try {
