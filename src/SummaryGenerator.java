@@ -338,13 +338,16 @@ public class SummaryGenerator {
 		if (sentence.length() < MAX_LENGTH)
 			return sentence;
 
+		String beforeSentence = sentence;
+		// Remove SBARs
 		Annotation document = new Annotation(sentence);
 		pipelineCompress.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
 		
-		// Remove SBARs
 		Tree tree = sentences.get(0).get(TreeAnnotation.class);
 	    Tree newTree = tree.prune(new MyFilter());
+	    if(newTree == null || newTree.yieldWords() == null)
+	    	return beforeSentence;
 	    StringBuilder sb = new StringBuilder();
 	    for(Word w: newTree.yieldWords())
 	    	sb.append(w.toString() + " ");
