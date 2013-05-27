@@ -1,6 +1,6 @@
 
 public class Main {
-	private final static String defaultInput = "docs";
+	private final static String defaultInput = "temp";
 	private final static String defaultOutput = "./eval/peers/1";
 	
 	private final static boolean REMOVE_CLOSED_CLASS = false;

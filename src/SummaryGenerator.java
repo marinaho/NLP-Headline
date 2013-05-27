@@ -5,10 +5,20 @@ import edu.stanford.nlp.ling.*;
 import edu.stanford.nlp.ling.CoreAnnotations.*;
 import edu.stanford.nlp.pipeline.*;
 import edu.stanford.nlp.trees.*;
+import edu.stanford.nlp.trees.TreeCoreAnnotations.TreeAnnotation;
 import edu.stanford.nlp.trees.semgraph.*;
 import edu.stanford.nlp.trees.semgraph.SemanticGraphCoreAnnotations.*;
 import edu.stanford.nlp.util.*;
 
+class MyFilter implements Filter<Tree> {
+
+	@Override
+	public boolean accept(Tree t) {
+		if(t.nodeString().startsWith("SBAR")) return false;
+		return true;
+	}
+	
+}
 class Tuple implements Comparable<Tuple> {
 	private final static double EPS = 1e-6;
 	public Double score;
@@ -178,12 +188,11 @@ public class SummaryGenerator {
 								&& !PUNCTUATION.contains(pos)) {
 							sentenceString.append(word).append(' ');
 							cscore = Math.log(tf.get(lemma)+1) * Math.log((double) noDocs / df.get(lemma));
-							sentenceScore += cscore;
-							/*if(cscore >= set.first().score)
+							if(cscore >= set.first().score)
 							{
 								++nBest;
-								sentenceScore = Math.max(sentenceScore, cscore);
-							}*/
+								sentenceScore += cscore;
+							}
 						}
 					}
 
@@ -196,9 +205,9 @@ public class SummaryGenerator {
 
 			// For java garbage collector
 			annotations.set(i, null);
-			// System.out.println("before compress " + bestSentence);
+			System.out.println("before compress " + bestSentence);
 			if(compressTag) bestSentence = compressSentence(bestSentence);
-			// System.out.println("after compress " + bestSentence);
+			System.out.println("after compress " + bestSentence);
 			
 			try {
 				out.write(bestSentence);
@@ -332,37 +341,56 @@ public class SummaryGenerator {
 		Annotation document = new Annotation(sentence);
 		pipelineCompress.annotate(document);
 		List<CoreMap> sentences = document.get(SentencesAnnotation.class);
+		
+		// Remove SBARs
+		Tree tree = sentences.get(0).get(TreeAnnotation.class);
+	    Tree newTree = tree.prune(new MyFilter());
+	    StringBuilder sb = new StringBuilder();
+	    for(Word w: newTree.yieldWords())
+	    	sb.append(w.toString() + " ");
+	    sentence = sb.toString();
 
-		SemanticGraph dependencies = sentences.get(0).get(
-				CollapsedCCProcessedDependenciesAnnotation.class);
+	    if (sentence.length() < MAX_LENGTH)
+			return sentence;
+	    
+	    // Remove temporals, abbreviations and appositives
+	    // Need to rerun pipeline because sentence has changed
+	    document = new Annotation(sentence);
+		pipelineCompress.annotate(document);
+		sentences = document.get(SentencesAnnotation.class);
+		SemanticGraph dependencies = sentences.get(0).get(CollapsedCCProcessedDependenciesAnnotation.class);
 
-		// Remove leaves from dependency graph
-		Set<IndexedWord> leaves = dependencies.getLeafVertices();
-		for (IndexedWord leaf : leaves)
-			dependencies.removeVertex(leaf);
-
-		String trimmedSentence = dependencies.toRecoveredSentenceString();
-		if(trimmedSentence.length() < MAX_LENGTH) return trimmedSentence;
-
-		// Remove temporals, abbreviations and appositives		
 		List<SemanticGraphEdge> listDep = dependencies.findAllRelns(EnglishGrammaticalRelations.APPOSITIONAL_MODIFIER);
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.TEMPORAL_MODIFIER));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ABBREVIATION_MODIFIER));
-		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADJECTIVAL_MODIFIER));
+		/*listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADJECTIVAL_MODIFIER));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.AGENT));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.ADVERBIAL_MODIFIER));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARTICIPIAL_MODIFIER));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.PARATAXIS));
 		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.CONJUNCT ));
-		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.COORDINATION ));
+		listDep.addAll(dependencies.findAllRelns(EnglishGrammaticalRelations.COORDINATION ));*/
 
 		for(SemanticGraphEdge edge : listDep)
 		{
 			IndexedWord w = edge.getDependent();
 			dependencies.removeVertex(w);
 		}
-		// System.out.println(dependencies.toRecoveredSentenceString());
-		return dependencies.toRecoveredSentenceString();
+		
+		sentence = dependencies.toRecoveredSentenceString();
+		
+		if (sentence.length() < MAX_LENGTH)
+			return sentence;
+		
+		// Remove leaves from dependency graph
+		// TO DO: Need to rerun pipeline because sentence has changed.
+		/*Set<IndexedWord> leaves = dependencies.getLeafVertices();
+		for (IndexedWord leaf : leaves)
+			dependencies.removeVertex(leaf);
+				
+		sentence = dependencies.toRecoveredSentenceString();*/
+		
+		return sentence; 
 	}
 }
 
